@@ -1,7 +1,42 @@
 "use client";
-import Image from "next/image";
-import { useState } from "react";
-import { Box, Stack, TextField, Button } from "@mui/material";
+
+import { useState, useEffect, useRef } from "react";
+import { Box, Stack, TextField, Button, Typography, Avatar, useTheme } from "@mui/material";
+import SendIcon from '@mui/icons-material/Send';
+import { styled } from '@mui/system';
+
+function ChatMessage({ message }) {
+  const theme = useTheme();
+  const isAssistant = message.role === "assistant";
+
+  return (
+    <Box
+      display="flex"
+      justifyContent={isAssistant ? "flex-start" : "flex-end"}
+      sx={{ mb: 2 }}
+    >
+      {isAssistant && (
+        <Avatar sx={{ bgcolor: theme.palette.primary.main, mr: 2 }}>
+          🤖
+        </Avatar>
+      )}
+      <Box
+        sx={{
+          bgcolor: isAssistant ? theme.palette.primary.light : theme.palette.secondary.light,
+          color: theme.palette.getContrastText(isAssistant ? theme.palette.primary.light : theme.palette.secondary.light),
+          borderRadius: 2,
+          p: 2,
+          maxWidth: "75%",
+          wordWrap: "break-word",
+          boxShadow: 3,
+          animation: 'fadeIn 0.5s ease-out',
+        }}
+      >
+        {message.content}
+      </Box>
+    </Box>
+  );
+}
 
 export default function Home() {
   const [messages, setMessages] = useState([
@@ -10,102 +45,154 @@ export default function Home() {
       content: `Hello! Welcome to Mental Streak's Customer Support. I'm here to assist you with any questions or issues you might have.`,
     },
   ]);
-
   const [message, setMessage] = useState("");
+  const inputRef = useRef(null); 
 
-  const sendMessage = async() =>{
-    setMessages((messages) =>[
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus(); 
+    }
+  }, [message]); 
+
+  const sendMessage = async (e) => {
+    e.preventDefault(); 
+
+    if (!message) return; 
+
+    const newMessages = [
       ...messages,
-      {role:'user', content: message},
-      {role:'assistant', content:''},
-    ])
-    const response = fetch('/api/chat',{
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body:JSON.stringify([...messages, {role:'user',content:message}]),
-    }).then(async (res) => {
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
+      { role: "user", content: message },
+      { role: "assistant", content: "" },
+    ];
+    setMessages(newMessages);
+    setMessage(""); 
 
-      let result = ''
-      return reader.read().then(function processRexr({done,value}){
-        if(done){
-          return result
-        }
-        const text = decoder.decode(value || new Int8Array(), {stream:true})
-        setMessages((messages)=>{
-          let lastMessage = messages[messages.length -1]
-          let otherMessages = message.slice(0,messages.length-1)
-          return [
-            ...otherMessages,
-            {
-              ...lastMessage,
-              content: lastMessage.content + text,
-            },
-          ]
-        })
-        return reader.read().then(processText)
-      })
-    })
-  }
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message }), 
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch response from Gemini API:', response.statusText);
+        return;
+      }
+
+      // Use .text() since the API response is plain text
+      const assistantMessage = await response.text();
+
+      setMessages((messages) => [
+        ...messages.slice(0, -1), 
+        { role: "assistant", content: assistantMessage },
+      ]);
+
+    } catch (error) {
+      console.error('An error occurred while sending the message:', error);
+    }
+  };
+
+  const StyledTextField = styled(TextField)(({ theme }) => ({
+    '& .MuiOutlinedInput-root': {
+      borderRadius: 20,
+      paddingRight: theme.spacing(1),
+      '&.Mui-focused fieldset': {
+        borderColor: theme.palette.primary.main,
+        boxShadow: `0 0 5px ${theme.palette.primary.main}`,
+      },
+    },
+  }));
 
   return (
     <Box
       width="100vw"
       height="100vh"
       display="flex"
-      flexdirection="column"
+      flexDirection="column"
       alignItems="center"
       justifyContent="center"
+      sx={{
+        bgcolor: "background.default",
+        p: 2,
+        background: `linear-gradient(135deg, #6E8EF3 0%, #A1C4FD 100%)`,
+      }}
     >
+      <Typography variant="h4" sx={{ mb: 3, color: "#FFF" }}>
+        Mental Streak Customer Support
+      </Typography>
       <Stack
         direction="column"
-        width="600px"
-        height="700px"
-        border="1px solid black"
-        p={2}
+        sx={{
+          width: "100%",
+          maxWidth: 600,
+          height: "70%",
+          border: 1,
+          borderColor: "divider",
+          borderRadius: 4,
+          boxShadow: 4,
+          bgcolor: "background.paper",
+          p: 3,
+          position: "relative",
+          overflow: "hidden",
+        }}
         spacing={3}
       >
         <Stack
           direction="column"
           spacing={2}
           flexGrow={1}
-          overflow="auto"
-          maxHeight="100%"
+          sx={{
+            overflowY: "auto",
+            maxHeight: "100%",
+            pr: 1,
+            "&::-webkit-scrollbar": {
+              width: 8,
+            },
+            "&::-webkit-scrollbar-thumb": {
+              backgroundColor: "#A1C4FD",
+              borderRadius: 4,
+            },
+          }}
         >
           {messages.map((message, index) => (
-            <Box
-              key={index}
-              display="flex"
-              justifyContent={
-                message.role === "assistant" ? "flex-start" : "flex-end"
-              }
-            >
-              <Box
-                bgcolor={
-                  message.role === "assistant"
-                    ? "primary.main"
-                    : "secondary.main"
-                }
-                color="white"
-                borderRadius={16}
-                p={3}
-              >
-                {message.content}
-              </Box>
-            </Box>
+            <ChatMessage key={index} message={message} />
           ))}
         </Stack>
-        <Stack direction="row" spacing={2}>
-          <TextField
-            label="message"
+        <Stack
+          component="form"
+          onSubmit={sendMessage} 
+          direction="row"
+          spacing={2}
+        >
+          <StyledTextField
+            label="Type your message..."
             fullWidth
             value={message}
+            inputRef={inputRef} 
             onChange={(e) => setMessage(e.target.value)}
+            sx={{
+              bgcolor: "background.paper",
+            }}
           />
-          <Button variant="contained" onClick={sendMessage}>Send</Button>
+          <Button
+            type="submit" 
+            variant="contained"
+            sx={{
+              bgcolor: "primary.main",
+              borderRadius: 20,
+              px: 4,
+              transition: "background-color 0.3s",
+              "&:hover": {
+                bgcolor: "primary.dark",
+                transform: "scale(1.05)",
+              },
+            }}
+            endIcon={<SendIcon />}
+          >
+            Send
+          </Button>
         </Stack>
       </Stack>
     </Box>

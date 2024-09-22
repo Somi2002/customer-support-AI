@@ -13,14 +13,17 @@ Direct users to mental health hotlines and emergency contact information when ne
 Always maintain user privacy and do not share personal information.
 If unsure about any information, it's okay to say you don't know and offer to connect the user with a human representative.
 
+You will say this in a consicse manner and be friendly as well 
 Your goal is to provide accurate information, assist with common inquiries, and ensure a positive experience for all Mental Streak users.
+
+Make sure to summarize your responses in 2-3 sentences not anything longer than that 
 `;
 
 export async function POST(req) {
   const { message } = await req.json();
 
   const genAI = new GoogleGenerativeAI(process.env.API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
   try {
     const prompt = systemPrompt + "\n\n" + message;
